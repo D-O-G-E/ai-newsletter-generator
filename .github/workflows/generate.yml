@@ -1,0 +1,43 @@
+name: Generate Newsletter (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Date string for header"
+        required: false
+        default: ""
+      model:
+        description: "OpenAI model"
+        required: false
+        default: "gpt-4o-mini"
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Build date string
+        id: dt
+        run: |
+          if [ -z "${{ github.event.inputs.date }}" ]; then
+            echo "DATE=$(date -u '+%B %d, %Y')" >> $GITHUB_OUTPUT
+          else
+            echo "DATE=${{ github.event.inputs.date }}" >> $GITHUB_OUTPUT
+          fi
+      - name: Generate newsletter
+        run: |
+          python newsletter_maker.py articles/a1.md articles/a2.md articles/a3.md \
+            --date "${{ steps.dt.outputs.DATE }}" \
+            --output newsletter.md \
+            --model "${{ github.event.inputs.model }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: newsletter
+          path: newsletter.md
