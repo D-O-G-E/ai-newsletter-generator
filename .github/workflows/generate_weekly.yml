@@ -1,0 +1,44 @@
+name: Generate Weekly AI Newsletter
+
+on:
+  schedule:
+    - cron: "0 13 * * MON"  # every Monday 13:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write   # needed to commit newsletter back to repo
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install -r requirements.txt
+
+      - name: Generate newsletter
+        run: |
+          DATE_STR=$(date -u '+%B %d, %Y')
+          OUT="newsletters/$(date -u +%Y-%m-%d).md"
+          python auto_newsletter.py --date "$DATE_STR" --output "$OUT"
+
+      - name: Commit & push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add newsletters/*.md
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: weekly AI newsletter $(date -u +%Y-%m-%d)"
+            git push
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: newsletter
+          path: newsletters/*.md
